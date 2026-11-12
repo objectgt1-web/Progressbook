@@ -51,7 +51,7 @@ label{display:block;margin-top:15px;color:#aab3ca}
 
 <main>
 <section id="loginPage" class="card">
- <h2>Welcome to MIXYBOOK</h2>
+ <h2>Welcome to Progress Book</h2>
  <p class="muted">Sign in to view your grades and assignments.</p>
  <input id="email" type="email" placeholder="Email">
  <input id="password" type="password" placeholder="Password">
@@ -433,15 +433,12 @@ async function deleteAssignment(assignment,button){
  const confirmed=confirm("Delete '"+assignment.title+"'? This will also delete all grades for this assignment. This cannot be undone.");
  if(!confirmed)return;
  button.disabled=true;button.textContent="Deleting...";
- 
- // Delete linked grades first so the assignment can be removed.
  const {error:gradeError}=await db.from("grades").delete().eq("assignment_id",assignment.id);
  if(gradeError){
   button.disabled=false;button.textContent="Delete Assignment";
   alert("Could not delete linked grades: "+gradeError.message);
   return;
  }
-
  const {error}=await db.from("assignments").delete().eq("id",assignment.id);
  if(error){
   button.disabled=false;button.textContent="Delete Assignment";
