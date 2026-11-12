@@ -683,21 +683,37 @@ async function updateGrade(grade,value,button){
 }
 
 function renderAssignments(){
+ function renderAssignments(){
  const box=$("assignmentList");
  box.innerHTML="";
+
  if(!assignments.length){
   box.textContent="No assignments created yet.";
   return;
  }
+
  assignments.forEach(a=>{
   const item=document.createElement("div");
   item.className="grade";
+
   const title=document.createElement("strong");
   title.textContent=a.title;
+
   const info=document.createElement("p");
   info.className="muted";
-  info.textContent=a.subject+" • "+a.points_possible+" points • "+a.weight_percent+"% weight";
-  item.append(title,info);
+
+  const className=classes.find(c=>c.id===a.class_id)?.name||"Class";
+
+  info.textContent=className+" • "+a.subject+" • "+
+   a.points_possible+" points • "+a.weight_percent+"% weight";
+
+  const button=document.createElement("button");
+  button.textContent="Delete Assignment";
+  button.style.background="#d94355";
+
+  button.onclick=()=>deleteAssignment(a,button);
+
+  item.append(title,info,button);
   box.appendChild(item);
  });
 }
