@@ -30,7 +30,6 @@ label{display:block;margin-top:15px;color:#aab3ca}
 .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}
 .subject-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
 .back{background:#303d5c;margin-bottom:15px}
-hr{border:0;border-top:1px solid #34415f;margin:20px 0}
 @media(max-width:650px){
  .grid{grid-template-columns:1fr}
  header{padding:16px 5%}
@@ -51,7 +50,6 @@ hr{border:0;border-top:1px solid #34415f;margin:20px 0}
 
 <main>
 
-<!-- LOGIN -->
 <section id="loginPage" class="card">
  <h2>Welcome to Progress Book</h2>
  <p class="muted">Sign in to view your grades and assignments.</p>
@@ -66,9 +64,6 @@ hr{border:0;border-top:1px solid #34415f;margin:20px 0}
  <div class="card">
   <h2 id="studentWelcome">Welcome!</h2>
   <p id="studentEmail" class="muted"></p>
-  <h3>Overall Grade</h3>
-  <div id="overallGrade" class="percentage">--</div>
-  <p class="muted">Average of your available subject grades</p>
  </div>
 
  <div id="subjectOverview" class="card">
@@ -87,7 +82,6 @@ hr{border:0;border-top:1px solid #34415f;margin:20px 0}
 
 <!-- TEACHER DASHBOARD -->
 <section id="adminPage" class="hidden">
-
  <div class="card">
   <h2>Teacher Dashboard</h2>
   <p class="muted">Manage students, assignments and grades.</p>
@@ -132,7 +126,6 @@ hr{border:0;border-top:1px solid #34415f;margin:20px 0}
 
  <div class="card">
   <h2>Give a Grade</h2>
-
   <label>Student</label>
   <select id="gradeStudent" onchange="filterGradeAssignments()"></select>
 
@@ -155,8 +148,8 @@ hr{border:0;border-top:1px solid #34415f;margin:20px 0}
   <h2>Assignments</h2>
   <div id="assignmentList"></div>
  </div>
-
 </section>
+
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -212,14 +205,12 @@ function weightedAverage(items){
  );
 
  const totalWeight=graded.reduce((sum,x)=>sum+Number(x.weight_percent),0);
-
  if(!totalWeight) return null;
 
  const weighted=graded.reduce((sum,x)=>
   sum+percent(x.points_earned,x.points_possible)*Number(x.weight_percent),0
  );
 
- // Normalize over assignments with grades so ungraded work does not count as zero
  return weighted/totalWeight;
 }
 
@@ -287,7 +278,7 @@ async function loadAccount(user){
  showPage("studentPage");
  $("studentEmail").textContent=user.email || "";
 
- const {data:student, error:studentError}=await db
+ const {data:student,error:studentError}=await db
   .from("students")
   .select("full_name,username")
   .eq("id",user.id)
@@ -337,9 +328,6 @@ function renderSubjectCards(){
  const box=$("subjectCards");
  box.innerHTML="";
 
- let overallTotal=0;
- let overallCount=0;
-
  SUBJECTS.forEach(subject=>{
   const items=subjectItems(subject);
   const average=weightedAverage(items);
@@ -361,15 +349,7 @@ function renderSubjectCards(){
 
   card.append(title,grade,count);
   box.appendChild(card);
-
-  if(average!==null){
-   overallTotal+=average;
-   overallCount++;
-  }
  });
-
- $("overallGrade").textContent=
-  overallCount?(overallTotal/overallCount).toFixed(1)+"%":"--";
 }
 
 function openSubject(subject){
