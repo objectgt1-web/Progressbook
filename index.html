@@ -1,0 +1,57 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PROGRESSBOOK</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial;background:#090b14;color:white}
+header{padding:22px 7%;background:#121729;border-bottom:1px solid #29334e}
+h1{margin:0;color:#8b9cff}
+main{max-width:950px;margin:65px auto;padding:20px}
+.card{background:#141b2e;padding:28px;border-radius:16px;margin-bottom:20px}
+input,button{width:100%;padding:13px;margin-top:12px;border-radius:8px;border:1px solid #34415f;font-size:16px}
+input{background:#090f20;color:white}
+button{background:#7185ff;color:white;border:0;font-weight:bold;cursor:pointer}
+.muted{color:#aab3ca}
+</style>
+</head>
+<body>
+<header>
+<h1>PROGRESSBOOK</h1>
+<p class="muted">Student Grade Portal</p>
+</header>
+<main>
+<div class="card">
+<h2>Welcome to PROGRESSBOOK</h2>
+<p class="muted">Sign in to view your grades and assignments.</p>
+<input id="email" type="email" placeholder="Email">
+<input id="password" type="password" placeholder="Password">
+<button onclick="login()">Sign In</button>
+<p id="message" class="muted"></p>
+</div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPABASE_URL = "https://tfasagpdyrsshpzjfxop.supabase.co";
+const SUPABASE_KEY = "sb_publishable_Xqsp4Sg-XrDthji84yiEfg_t9k1JG72";
+
+const db = window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+
+async function login(){
+ const email=document.getElementById("email").value;
+ const password=document.getElementById("password").value;
+ const message=document.getElementById("message");
+ message.textContent="Signing in...";
+ const {data,error}=await db.auth.signInWithPassword({email,password});
+ if(error){
+  message.textContent=error.message;
+  return;
+ }
+ message.textContent="Signed in successfully!";
+}
+</script>
+</body>
+</html>
