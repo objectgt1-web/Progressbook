@@ -4,54 +4,298 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PROGRESSBOOK</title>
+<title>Progress Book</title>
+
 <style>
 *{box-sizing:border-box}
-body{margin:0;font-family:Arial;background:#090b14;color:white}
-header{padding:22px 7%;background:#121729;border-bottom:1px solid #29334e}
+
+body{
+ margin:0;
+ font-family:Arial,sans-serif;
+ background:#090b14;
+ color:white;
+}
+
+header{
+ padding:22px 7%;
+ background:#121729;
+ border-bottom:1px solid #29334e;
+ display:flex;
+ justify-content:space-between;
+ align-items:center;
+}
+
 h1{margin:0;color:#8b9cff}
-main{max-width:950px;margin:65px auto;padding:20px}
-.card{background:#141b2e;padding:28px;border-radius:16px;margin-bottom:20px}
-input,button{width:100%;padding:13px;margin-top:12px;border-radius:8px;border:1px solid #34415f;font-size:16px}
-input{background:#090f20;color:white}
-button{background:#7185ff;color:white;border:0;font-weight:bold;cursor:pointer}
+
+main{
+ max-width:950px;
+ margin:50px auto;
+ padding:20px;
+}
+
+.card{
+ background:#141b2e;
+ padding:28px;
+ border-radius:16px;
+ margin-bottom:20px;
+}
+
+input,button{
+ width:100%;
+ padding:13px;
+ margin-top:12px;
+ border-radius:8px;
+ border:1px solid #34415f;
+ font-size:16px;
+}
+
+input{
+ background:#090f20;
+ color:white;
+}
+
+button{
+ background:#7185ff;
+ color:white;
+ border:0;
+ font-weight:bold;
+ cursor:pointer;
+}
+
+.logout{
+ width:auto;
+ padding:10px 18px;
+ margin:0;
+}
+
 .muted{color:#aab3ca}
+
+.hidden{display:none}
+
+.grade{
+ background:#202a43;
+ padding:15px;
+ border-radius:9px;
+ margin-top:12px;
+}
+
+#message{overflow-wrap:anywhere}
 </style>
 </head>
+
 <body>
+
 <header>
-<h1>PROGRESSBOOK</h1>
-<p class="muted">Student Grade Portal</p>
+ <div>
+  <h1>Progress Book</h1>
+  <p class="muted">Student Grade Portal</p>
+ </div>
+ <button id="logoutButton" class="logout hidden" onclick="logout()">Sign Out</button>
 </header>
+
 <main>
-<div class="card">
-<h2>Welcome to PROGRESSBOOK</h2>
-<p class="muted">Sign in to view your grades and assignments.</p>
-<input id="email" type="email" placeholder="Email">
-<input id="password" type="password" placeholder="Password">
-<button onclick="login()">Sign In</button>
-<p id="message" class="muted"></p>
+
+<!-- LOGIN -->
+<div id="loginPage" class="card">
+ <h2>Welcome to Progress Book</h2>
+ <p class="muted">Sign in to view your grades and assignments.</p>
+
+ <input id="email" type="email" placeholder="Email">
+ <input id="password" type="password" placeholder="Password">
+
+ <button id="loginButton" onclick="login()">Sign In</button>
+
+ <p id="message" class="muted"></p>
 </div>
+
+<!-- DASHBOARD -->
+<div id="dashboard" class="hidden">
+
+ <div class="card">
+  <h2 id="welcome">Welcome!</h2>
+  <p class="muted" id="studentEmail"></p>
+  <p id="studentInfo" class="muted">Loading profile...</p>
+ </div>
+
+ <div class="card">
+  <h2>Your Grades</h2>
+  <p class="muted">Your recorded assignment grades appear here.</p>
+  <div id="grades">
+   Loading grades...
+  </div>
+ </div>
+
+</div>
+
 </main>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
 <script>
 const SUPABASE_URL = "https://tfasagpdyrsshpzjfxop.supabase.co";
+
 const SUPABASE_KEY = "sb_publishable_Xqsp4Sg-XrDthji84yiEfg_t9k1JG72";
 
-const db = window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+const db = window.supabase.createClient(
+ SUPABASE_URL,
+ SUPABASE_KEY
+);
+
+const loginPage = document.getElementById("loginPage");
+const dashboard = document.getElementById("dashboard");
+const message = document.getElementById("message");
+
+function showDashboard(){
+ loginPage.classList.add("hidden");
+ dashboard.classList.remove("hidden");
+ document.getElementById("logoutButton").classList.remove("hidden");
+}
+
+function showLogin(){
+ dashboard.classList.add("hidden");
+ loginPage.classList.remove("hidden");
+ document.getElementById("logoutButton").classList.add("hidden");
+}
 
 async function login(){
- const email=document.getElementById("email").value;
- const password=document.getElementById("password").value;
- const message=document.getElementById("message");
- message.textContent="Signing in...";
- const {data,error}=await db.auth.signInWithPassword({email,password});
- if(error){
-  message.textContent=error.message;
+
+ const email = document.getElementById("email").value.trim();
+ const password = document.getElementById("password").value;
+ const button = document.getElementById("loginButton");
+
+ if(!email || !password){
+  message.textContent = "Enter your email and password.";
   return;
  }
- message.textContent="Signed in successfully!";
+
+ button.disabled = true;
+ button.textContent = "Signing in...";
+ message.textContent = "";
+
+ const {data,error} = await db.auth.signInWithPassword({
+  email,
+  password
+ });
+
+ button.disabled = false;
+ button.textContent = "Sign In";
+
+ if(error){
+  message.textContent = error.message;
+  return;
+ }
+
+ await loadDashboard(data.user);
 }
+
+async function loadDashboard(user){
+
+ showDashboard();
+
+ document.getElementById("welcome").textContent = "Welcome!";
+ document.getElementById("studentEmail").textContent = user.email || "";
+ document.getElementById("studentInfo").textContent = "Loading profile...";
+ document.getElementById("grades").textContent = "Loading grades...";
+
+ // Load student profile
+ const {data:student,error:studentError} = await db
+  .from("students")
+  .select("id,username,full_name")
+  .eq("id",user.id)
+  .maybeSingle();
+
+ if(studentError){
+  document.getElementById("studentInfo").textContent =
+   "Could not load student profile: " + studentError.message;
+ }else if(student){
+  document.getElementById("welcome").textContent =
+   "Welcome, " + (student.full_name || student.username || "Student") + "!";
+
+  document.getElementById("studentInfo").textContent =
+   "Username: " + (student.username || "Not set");
+ }else{
+  document.getElementById("studentInfo").textContent =
+   "No student profile found for this account yet.";
+ }
+
+ // Load grades
+ const gradesBox = document.getElementById("grades");
+
+ const {data:grades,error:gradesError} = await db
+  .from("grades")
+  .select("points_earned,assignments(title,points_possible,due_date)")
+  .eq("student_id",user.id);
+
+ if(gradesError){
+  gradesBox.textContent = "Could not load grades: " + gradesError.message;
+  return;
+ }
+
+ gradesBox.innerHTML = "";
+
+ if(!grades || grades.length === 0){
+  gradesBox.textContent = "No grades have been added yet.";
+  return;
+ }
+
+ grades.forEach(grade => {
+
+  const assignment = grade.assignments;
+
+  const item = document.createElement("div");
+  item.className = "grade";
+
+  const title = document.createElement("strong");
+  title.textContent = assignment?.title || "Assignment";
+
+  const score = document.createElement("p");
+  score.className = "muted";
+
+  score.textContent =
+   grade.points_earned + " / " +
+   (assignment?.points_possible ?? "?") + " points";
+
+  item.appendChild(title);
+  item.appendChild(score);
+
+  if(assignment?.due_date){
+   const due = document.createElement("p");
+   due.className = "muted";
+   due.textContent = "Due: " + assignment.due_date;
+   item.appendChild(due);
+  }
+
+  gradesBox.appendChild(item);
+ });
+}
+
+async function logout(){
+
+ await db.auth.signOut();
+ showLogin();
+
+ document.getElementById("email").value = "";
+ document.getElementById("password").value = "";
+ message.textContent = "Signed out.";
+}
+
+// Restore existing login session
+async function checkSession(){
+
+ const {data,error} = await db.auth.getSession();
+
+ if(error){
+  message.textContent = error.message;
+  return;
+ }
+
+ if(data.session){
+  await loadDashboard(data.session.user);
+ }
+}
+
+checkSession();
 </script>
+
 </body>
 </html>
