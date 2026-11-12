@@ -42,7 +42,7 @@ label{display:block;margin-top:15px;color:#aab3ca}
 
 <header>
  <div>
-  <h1>Progress Book</h1>
+  <h1>MIXYBOOK</h1>
   <p class="muted">Student Grade Portal</p>
  </div>
  <button id="logoutButton" class="logout hidden" onclick="logout()">Sign Out</button>
@@ -51,7 +51,7 @@ label{display:block;margin-top:15px;color:#aab3ca}
 <main>
 
 <section id="loginPage" class="card">
- <h2>Welcome to Progress Book</h2>
+ <h2>Welcome to MIXYBOOK</h2>
  <p class="muted">Sign in to view your grades and assignments.</p>
  <input id="email" type="email" placeholder="Email">
  <input id="password" type="password" placeholder="Password">
@@ -59,7 +59,6 @@ label{display:block;margin-top:15px;color:#aab3ca}
  <p id="message" class="notice"></p>
 </section>
 
-<!-- STUDENT DASHBOARD -->
 <section id="studentPage" class="hidden">
  <div class="card">
   <h2 id="studentWelcome">Welcome!</h2>
@@ -80,12 +79,32 @@ label{display:block;margin-top:15px;color:#aab3ca}
  </div>
 </section>
 
-<!-- TEACHER DASHBOARD -->
 <section id="adminPage" class="hidden">
  <div class="card">
   <h2>Teacher Dashboard</h2>
   <p class="muted">Manage students, assignments and grades.</p>
   <p id="adminStatus" class="notice"></p>
+ </div>
+
+ <!-- CREATE STUDENT -->
+ <div class="card">
+  <h2>Create Student</h2>
+  <p class="muted">Create a student login account. No class enrollment is required.</p>
+
+  <label>Student Name</label>
+  <input id="studentName" placeholder="Full name">
+
+  <label>Username</label>
+  <input id="studentUsername" placeholder="Example: student123">
+
+  <label>Email</label>
+  <input id="studentEmailInput" type="email" placeholder="student@example.com">
+
+  <label>Password</label>
+  <input id="studentPassword" type="password" placeholder="At least 8 characters">
+
+  <button id="createStudentButton" onclick="createStudent()">Create Student Account</button>
+  <p id="createStudentMessage" class="notice"></p>
  </div>
 
  <div class="card">
@@ -158,7 +177,6 @@ const SUPABASE_URL="https://tfasagpdyrsshpzjfxop.supabase.co";
 const SUPABASE_KEY="sb_publishable_Xqsp4Sg-XrDthji84yiEfg_t9k1JG72";
 
 const db=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
-
 const SUBJECTS=["Science","Social Studies","Math","Specials","ELA"];
 
 let currentUser=null;
@@ -203,64 +221,44 @@ function weightedAverage(items){
   x.points_earned!==undefined &&
   Number(x.weight_percent)>0
  );
-
  const totalWeight=graded.reduce((sum,x)=>sum+Number(x.weight_percent),0);
  if(!totalWeight) return null;
-
- const weighted=graded.reduce((sum,x)=>
+ return graded.reduce((sum,x)=>
   sum+percent(x.points_earned,x.points_possible)*Number(x.weight_percent),0
- );
-
- return weighted/totalWeight;
+ )/totalWeight;
 }
 
 function parseFraction(value,possible){
  const match=value.trim().match(/^(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)$/);
  if(!match) return null;
-
  const earned=Number(match[1]);
  const denominator=Number(match[2]);
-
- if(!Number.isFinite(earned) ||
-    denominator!==Number(possible) ||
-    earned<0 ||
-    earned>denominator) return null;
-
+ if(!Number.isFinite(earned)||denominator!==Number(possible)||earned<0||earned>denominator) return null;
  return earned;
 }
 
 async function login(){
  const email=$("email").value.trim();
  const password=$("password").value;
-
- if(!email || !password){
+ if(!email||!password){
   $("message").textContent="Enter your email and password.";
   return;
  }
-
  $("loginButton").disabled=true;
  $("message").textContent="Signing in...";
-
  const {data,error}=await db.auth.signInWithPassword({email,password});
-
  $("loginButton").disabled=false;
-
  if(error){
   $("message").textContent=error.message;
   return;
  }
-
  await loadAccount(data.user);
 }
 
 async function loadAccount(user){
  currentUser=user;
-
- const {data:teacher,error}=await db
-  .from("teachers")
-  .select("id,full_name")
-  .eq("id",user.id)
-  .maybeSingle();
+ const {data:teacher,error}=await db.from("teachers")
+  .select("id,full_name").eq("id",user.id).maybeSingle();
 
  if(error){
   showLogin();
@@ -270,19 +268,16 @@ async function loadAccount(user){
 
  if(teacher){
   showPage("adminPage");
-  $("adminStatus").textContent="Signed in as "+(teacher.full_name || "Teacher");
+  $("adminStatus").textContent="Signed in as "+(teacher.full_name||"Teacher");
   await loadAdmin();
   return;
  }
 
  showPage("studentPage");
- $("studentEmail").textContent=user.email || "";
+ $("studentEmail").textContent=user.email||"";
 
- const {data:student,error:studentError}=await db
-  .from("students")
-  .select("full_name,username")
-  .eq("id",user.id)
-  .maybeSingle();
+ const {data:student,error:studentError}=await db.from("students")
+  .select("full_name,username").eq("id",user.id).maybeSingle();
 
  if(studentError){
   $("studentWelcome").textContent="Welcome!";
@@ -290,17 +285,70 @@ async function loadAccount(user){
   return;
  }
 
- $("studentWelcome").textContent=
-  "Welcome, "+(student?.full_name || student?.username || "Student")+"!";
-
+ $("studentWelcome").textContent="Welcome, "+(student?.full_name||student?.username||"Student")+"!";
  await loadStudentDashboard(user.id);
+}
+
+// CREATE STUDENT ACCOUNT
+
+async function createStudent(){
+ const full_name=$("studentName").value.trim();
+ const username=$("studentUsername").value.trim();
+ const email=$("studentEmailInput").value.trim();
+ const password=$("studentPassword").value;
+ const button=$("createStudentButton");
+ const message=$("createStudentMessage");
+
+ if(!full_name||!username||!email||!password){
+  message.textContent="Please complete every field.";
+  return;
+ }
+
+ if(!/^[a-zA-Z0-9_]{3,24}$/.test(username)){
+  message.textContent="Username must be 3 to 24 characters and use only letters, numbers or underscores.";
+  return;
+ }
+
+ if(password.length<8){
+  message.textContent="Password must be at least 8 characters.";
+  return;
+ }
+
+ button.disabled=true;
+ button.textContent="Creating account...";
+ message.textContent="";
+
+ const {data,error}=await db.functions.invoke("create-student",{
+  body:{full_name,username,email,password}
+ });
+
+ button.disabled=false;
+ button.textContent="Create Student Account";
+
+ if(error){
+  message.textContent="Could not create student: "+error.message;
+  return;
+ }
+
+ if(data?.error){
+  message.textContent="Could not create student: "+data.error;
+  return;
+ }
+
+ message.textContent="Student account created successfully!";
+
+ $("studentName").value="";
+ $("studentUsername").value="";
+ $("studentEmailInput").value="";
+ $("studentPassword").value="";
+
+ await loadAdmin();
 }
 
 // STUDENT DASHBOARD
 
 async function loadStudentDashboard(userId){
- const {data,error}=await db
-  .from("grades")
+ const {data,error}=await db.from("grades")
   .select("id,points_earned,assignments(id,title,subject,points_possible,weight_percent,due_date)")
   .eq("student_id",userId);
 
@@ -309,14 +357,11 @@ async function loadStudentDashboard(userId){
   return;
  }
 
- studentGradeData=(data || [])
-  .filter(g=>g.assignments)
-  .map(g=>({
-   ...g.assignments,
-   points_earned:g.points_earned,
-   grade_id:g.id
-  }));
-
+ studentGradeData=(data||[]).filter(g=>g.assignments).map(g=>({
+  ...g.assignments,
+  points_earned:g.points_earned,
+  grade_id:g.id
+ }));
  renderSubjectCards();
 }
 
@@ -327,26 +372,20 @@ function subjectItems(subject){
 function renderSubjectCards(){
  const box=$("subjectCards");
  box.innerHTML="";
-
  SUBJECTS.forEach(subject=>{
   const items=subjectItems(subject);
   const average=weightedAverage(items);
-
   const card=document.createElement("div");
   card.className="subject-card";
   card.onclick=()=>openSubject(subject);
-
   const title=document.createElement("h3");
   title.textContent=subject;
-
   const grade=document.createElement("div");
   grade.className="percentage";
   grade.textContent=average===null?"--":average.toFixed(1)+"%";
-
   const count=document.createElement("p");
   count.className="muted";
   count.textContent=items.length+" assignments";
-
   card.append(title,grade,count);
   box.appendChild(card);
  });
@@ -355,54 +394,35 @@ function renderSubjectCards(){
 function openSubject(subject){
  $("subjectOverview").classList.add("hidden");
  $("subjectDetails").classList.remove("hidden");
-
  $("detailTitle").textContent=subject;
-
  const items=subjectItems(subject);
  const average=weightedAverage(items);
-
- $("detailAverage").textContent=
-  average===null?"No graded assignments":average.toFixed(1)+"%";
-
+ $("detailAverage").textContent=average===null?"No graded assignments":average.toFixed(1)+"%";
  const box=$("detailAssignments");
  box.innerHTML="";
-
  if(!items.length){
   box.textContent="No assignments in this subject yet.";
   return;
  }
-
  items.forEach(a=>{
   const item=document.createElement("div");
   item.className="grade";
-
   const title=document.createElement("strong");
   title.textContent=a.title;
-
   const score=document.createElement("div");
   score.className="percentage";
-
-  if(a.points_earned===null || a.points_earned===undefined){
-   score.textContent="Not graded";
-  }else{
-   score.textContent=percent(a.points_earned,a.points_possible).toFixed(1)+"%";
-  }
-
+  score.textContent=a.points_earned===null||a.points_earned===undefined
+   ?"Not graded":percent(a.points_earned,a.points_possible).toFixed(1)+"%";
   const info=document.createElement("p");
   info.className="muted";
-  info.textContent=
-   (a.points_earned ?? "--")+" / "+a.points_possible+
-   " points • Weight: "+a.weight_percent+"%";
-
+  info.textContent=(a.points_earned??"--")+" / "+a.points_possible+" points • Weight: "+a.weight_percent+"%";
   item.append(title,score,info);
-
   if(a.due_date){
    const due=document.createElement("p");
    due.className="muted";
    due.textContent="Due: "+a.due_date;
    item.appendChild(due);
   }
-
   box.appendChild(item);
  });
 }
@@ -432,54 +452,42 @@ async function loadAdmin(){
   $("studentList").textContent="Student error: "+studentResult.error.message;
   return;
  }
-
  if(classResult.error){
   $("adminStatus").textContent="Class error: "+classResult.error.message;
   return;
  }
-
  if(gradeResult.error){
   $("adminGrades").textContent="Grade error: "+gradeResult.error.message;
   return;
  }
 
- students=studentResult.data || [];
- classes=classResult.data || [];
- grades=gradeResult.data || [];
+ students=studentResult.data||[];
+ classes=classResult.data||[];
+ grades=gradeResult.data||[];
 
  if(classes.length){
   const classIds=classes.map(c=>c.id);
-
   const [assignmentResult,enrollmentResult]=await Promise.all([
-   db.from("assignments")
-    .select("id,title,subject,points_possible,weight_percent,class_id,due_date")
-    .in("class_id",classIds),
-
-   db.from("enrollments")
-    .select("student_id,class_id")
-    .in("class_id",classIds)
+   db.from("assignments").select("id,title,subject,points_possible,weight_percent,class_id,due_date").in("class_id",classIds),
+   db.from("enrollments").select("student_id,class_id").in("class_id",classIds)
   ]);
 
   if(assignmentResult.error){
    $("assignmentList").textContent=assignmentResult.error.message;
    return;
   }
-
   if(enrollmentResult.error){
    $("adminStatus").textContent="Enrollment error: "+enrollmentResult.error.message;
    return;
   }
-
-  assignments=assignmentResult.data || [];
-  enrollments=enrollmentResult.data || [];
+  assignments=assignmentResult.data||[];
+  enrollments=enrollmentResult.data||[];
  }else{
   assignments=[];
   enrollments=[];
  }
 
- $("adminStatus").textContent=
-  students.length+" students • "+classes.length+" classes • "+assignments.length+" assignments";
-
+ $("adminStatus").textContent=students.length+" students • "+classes.length+" classes • "+assignments.length+" assignments";
  renderStudents();
  fillClassOptions();
  fillSubjectOptions();
@@ -493,24 +501,19 @@ function renderStudents(){
  const box=$("studentList");
  const search=$("studentSearch").value.toLowerCase();
  box.innerHTML="";
-
  const filtered=students.filter(s=>
-  (s.full_name || "").toLowerCase().includes(search) ||
-  (s.username || "").toLowerCase().includes(search)
+  (s.full_name||"").toLowerCase().includes(search)||
+  (s.username||"").toLowerCase().includes(search)
  );
-
  if(!filtered.length){
   box.textContent="No students found.";
   return;
  }
-
  filtered.forEach(s=>{
   const item=document.createElement("div");
   item.className="student";
-
   const name=document.createElement("span");
-  name.textContent=(s.full_name || s.username || "Student")+" ("+(s.username || "no username")+")";
-
+  name.textContent=(s.full_name||s.username||"Student")+" ("+(s.username||"no username")+")";
   const button=document.createElement("button");
   button.className="smallbutton";
   button.textContent="Select";
@@ -519,7 +522,6 @@ function renderStudents(){
    filterGradeAssignments();
    $("gradeStudent").scrollIntoView({behavior:"smooth",block:"center"});
   };
-
   item.append(name,button);
   box.appendChild(item);
  });
@@ -528,12 +530,8 @@ function renderStudents(){
 function fillClassOptions(){
  const select=$("newClass");
  select.innerHTML="";
-
  classes.forEach(c=>select.appendChild(makeOption(c.id,c.name)));
-
- if(!classes.length){
-  select.appendChild(makeOption("","No classes available"));
- }
+ if(!classes.length) select.appendChild(makeOption("","No classes available"));
 }
 
 function fillSubjectOptions(){
@@ -545,14 +543,8 @@ function fillSubjectOptions(){
 function fillGradeStudents(){
  const select=$("gradeStudent");
  select.innerHTML="";
-
- students.forEach(s=>{
-  select.appendChild(makeOption(s.id,s.full_name || s.username || "Student"));
- });
-
- if(!students.length){
-  select.appendChild(makeOption("","No students"));
- }
+ students.forEach(s=>select.appendChild(makeOption(s.id,s.full_name||s.username||"Student")));
+ if(!students.length) select.appendChild(makeOption("","No students"));
 }
 
 async function createAssignment(){
@@ -561,10 +553,9 @@ async function createAssignment(){
  const title=$("newTitle").value.trim();
  const points=Number($("newPoints").value);
  const weight=Number($("newWeight").value);
- const due=$("newDue").value || null;
+ const due=$("newDue").value||null;
 
- if(!classId || !title || !Number.isFinite(points) || points<=0 ||
-    !Number.isFinite(weight) || weight<=0 || weight>100){
+ if(!classId||!title||!Number.isFinite(points)||points<=0||!Number.isFinite(weight)||weight<=0||weight>100){
   $("assignmentMessage").textContent="Complete all fields with valid points and weight.";
   return;
  }
@@ -574,12 +565,7 @@ async function createAssignment(){
  button.textContent="Creating...";
 
  const {error}=await db.from("assignments").insert({
-  class_id:classId,
-  subject,
-  title,
-  points_possible:points,
-  weight_percent:weight,
-  due_date:due
+  class_id:classId,subject,title,points_possible:points,weight_percent:weight,due_date:due
  });
 
  button.disabled=false;
@@ -595,7 +581,6 @@ async function createAssignment(){
  $("newPoints").value="";
  $("newWeight").value="";
  $("newDue").value="";
-
  await loadAdmin();
 }
 
@@ -603,25 +588,10 @@ function filterGradeAssignments(){
  const studentId=$("gradeStudent").value;
  const select=$("gradeAssignment");
  select.innerHTML="";
-
- const enrolledClassIds=enrollments
-  .filter(e=>e.student_id===studentId)
-  .map(e=>e.class_id);
-
- const available=assignments.filter(a=>
-  enrolledClassIds.includes(a.class_id)
- );
-
- available.forEach(a=>{
-  select.appendChild(makeOption(
-   a.id,
-   a.subject+" • "+a.title+" ("+a.points_possible+" points)"
-  ));
- });
-
- if(!available.length){
-  select.appendChild(makeOption("","No assignments for this student's classes"));
- }
+ const enrolledClassIds=enrollments.filter(e=>e.student_id===studentId).map(e=>e.class_id);
+ const available=assignments.filter(a=>enrolledClassIds.includes(a.class_id));
+ available.forEach(a=>select.appendChild(makeOption(a.id,a.subject+" • "+a.title+" ("+a.points_possible+" points)")));
+ if(!available.length) select.appendChild(makeOption("","No assignments for this student's classes"));
 }
 
 async function saveGrade(){
@@ -629,37 +599,25 @@ async function saveGrade(){
  const assignmentId=$("gradeAssignment").value;
  const assignment=assignments.find(a=>a.id===assignmentId);
 
- if(!studentId || !assignment){
+ if(!studentId||!assignment){
   $("gradeMessage").textContent="Select a student and assignment.";
   return;
  }
 
  const earned=parseFraction($("gradePoints").value,assignment.points_possible);
-
  if(earned===null){
-  $("gradeMessage").textContent=
-   "Enter a valid fraction like 8/"+assignment.points_possible+".";
+  $("gradeMessage").textContent="Enter a valid fraction like 8/"+assignment.points_possible+".";
   return;
  }
 
  $("gradeMessage").textContent="Saving grade...";
-
- const existing=grades.find(g=>
-  g.student_id===studentId && g.assignment_id===assignmentId
- );
-
+ const existing=grades.find(g=>g.student_id===studentId&&g.assignment_id===assignmentId);
  let result;
 
  if(existing){
-  result=await db.from("grades")
-   .update({points_earned:earned})
-   .eq("id",existing.id);
+  result=await db.from("grades").update({points_earned:earned}).eq("id",existing.id);
  }else{
-  result=await db.from("grades").insert({
-   student_id:studentId,
-   assignment_id:assignmentId,
-   points_earned:earned
-  });
+  result=await db.from("grades").insert({student_id:studentId,assignment_id:assignmentId,points_earned:earned});
  }
 
  if(result.error){
@@ -667,9 +625,7 @@ async function saveGrade(){
   return;
  }
 
- $("gradeMessage").textContent=
-  "Saved! Score: "+percent(earned,assignment.points_possible).toFixed(1)+"%";
-
+ $("gradeMessage").textContent="Saved! Score: "+percent(earned,assignment.points_possible).toFixed(1)+"%";
  $("gradePoints").value="";
  await loadAdmin();
 }
@@ -677,7 +633,6 @@ async function saveGrade(){
 function renderAdminGrades(){
  const box=$("adminGrades");
  box.innerHTML="";
-
  if(!grades.length){
   box.textContent="No grades recorded yet.";
   return;
@@ -690,27 +645,19 @@ function renderAdminGrades(){
 
   const item=document.createElement("div");
   item.className="grade";
-
   const title=document.createElement("strong");
-  title.textContent=(student?.full_name || student?.username || "Student")+
-   " • "+assignment.subject+" • "+assignment.title;
-
+  title.textContent=(student?.full_name||student?.username||"Student")+" • "+assignment.subject+" • "+assignment.title;
   const score=document.createElement("div");
   score.className="percentage";
   score.textContent=percent(g.points_earned,assignment.points_possible).toFixed(1)+"%";
-
   const points=document.createElement("p");
   points.className="muted";
-  points.textContent=g.points_earned+" / "+assignment.points_possible+
-   " points • Weight: "+assignment.weight_percent+"%";
-
+  points.textContent=g.points_earned+" / "+assignment.points_possible+" points • Weight: "+assignment.weight_percent+"%";
   const edit=document.createElement("input");
   edit.placeholder="New score e.g. 9/10";
-
   const button=document.createElement("button");
   button.textContent="Update Grade";
   button.onclick=()=>updateGrade(g,edit.value,button);
-
   item.append(title,score,points,edit,button);
   box.appendChild(item);
  });
@@ -719,51 +666,37 @@ function renderAdminGrades(){
 async function updateGrade(grade,value,button){
  const possible=grade.assignments?.points_possible;
  const earned=parseFraction(value,possible);
-
  if(earned===null){
   alert("Enter a valid fraction like 8/"+possible+".");
   return;
  }
-
  button.disabled=true;
  button.textContent="Updating...";
-
- const {error}=await db.from("grades")
-  .update({points_earned:earned})
-  .eq("id",grade.id);
-
+ const {error}=await db.from("grades").update({points_earned:earned}).eq("id",grade.id);
  button.disabled=false;
  button.textContent="Update Grade";
-
  if(error){
   alert("Update failed: "+error.message);
   return;
  }
-
  await loadAdmin();
 }
 
 function renderAssignments(){
  const box=$("assignmentList");
  box.innerHTML="";
-
  if(!assignments.length){
   box.textContent="No assignments created yet.";
   return;
  }
-
  assignments.forEach(a=>{
   const item=document.createElement("div");
   item.className="grade";
-
   const title=document.createElement("strong");
   title.textContent=a.title;
-
   const info=document.createElement("p");
   info.className="muted";
-  info.textContent=a.subject+" • "+a.points_possible+
-   " points • "+a.weight_percent+"% weight";
-
+  info.textContent=a.subject+" • "+a.points_possible+" points • "+a.weight_percent+"% weight";
   item.append(title,info);
   box.appendChild(item);
  });
@@ -780,15 +713,11 @@ async function logout(){
 
 async function checkSession(){
  const {data,error}=await db.auth.getSession();
-
  if(error){
   $("message").textContent=error.message;
   return;
  }
-
- if(data.session){
-  await loadAccount(data.session.user);
- }
+ if(data.session) await loadAccount(data.session.user);
 }
 
 checkSession();
