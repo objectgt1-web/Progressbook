@@ -3,86 +3,30 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Progress Book</title>
-
 <style>
 *{box-sizing:border-box}
-
-body{
- margin:0;
- font-family:Arial,sans-serif;
- background:#090b14;
- color:white;
-}
-
-header{
- padding:22px 7%;
- background:#121729;
- border-bottom:1px solid #29334e;
- display:flex;
- justify-content:space-between;
- align-items:center;
-}
-
+body{margin:0;font-family:Arial;background:#090b14;color:white}
+header{padding:20px 7%;background:#121729;border-bottom:1px solid #29334e;display:flex;justify-content:space-between;align-items:center}
 h1{margin:0;color:#8b9cff}
-
-main{
- max-width:950px;
- margin:50px auto;
- padding:20px;
-}
-
-.card{
- background:#141b2e;
- padding:28px;
- border-radius:16px;
- margin-bottom:20px;
-}
-
-input,button{
- width:100%;
- padding:13px;
- margin-top:12px;
- border-radius:8px;
- border:1px solid #34415f;
- font-size:16px;
-}
-
-input{
- background:#090f20;
- color:white;
-}
-
-button{
- background:#7185ff;
- color:white;
- border:0;
- font-weight:bold;
- cursor:pointer;
-}
-
-.logout{
- width:auto;
- padding:10px 18px;
- margin:0;
-}
-
+main{max-width:1000px;margin:40px auto;padding:20px}
+.card{background:#141b2e;padding:25px;border-radius:15px;margin-bottom:20px}
+input,select,button{width:100%;padding:13px;margin-top:10px;border-radius:8px;border:1px solid #34415f;font-size:15px}
+input,select{background:#090f20;color:white}
+button{background:#7185ff;color:white;border:0;font-weight:bold;cursor:pointer}
+button:disabled{opacity:.5;cursor:not-allowed}
+.logout{width:auto;margin:0;padding:10px 18px}
 .muted{color:#aab3ca}
-
 .hidden{display:none}
-
-.grade{
- background:#202a43;
- padding:15px;
- border-radius:9px;
- margin-top:12px;
-}
-
-#message{overflow-wrap:anywhere}
+.grade,.student{background:#202a43;padding:15px;border-radius:9px;margin-top:12px}
+.student{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.smallbutton{width:auto;padding:9px 14px;margin:0}
+.notice{color:#aab3ca;overflow-wrap:anywhere}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:15px}
+@media(max-width:650px){.grid{grid-template-columns:1fr}header{padding:16px 5%}}
 </style>
 </head>
-
 <body>
 
 <header>
@@ -95,207 +39,424 @@ button{
 
 <main>
 
-<!-- LOGIN -->
 <div id="loginPage" class="card">
  <h2>Welcome to Progress Book</h2>
  <p class="muted">Sign in to view your grades and assignments.</p>
-
  <input id="email" type="email" placeholder="Email">
  <input id="password" type="password" placeholder="Password">
-
  <button id="loginButton" onclick="login()">Sign In</button>
-
- <p id="message" class="muted"></p>
+ <p id="message" class="notice"></p>
 </div>
 
-<!-- DASHBOARD -->
-<div id="dashboard" class="hidden">
-
+<div id="studentPage" class="hidden">
  <div class="card">
-  <h2 id="welcome">Welcome!</h2>
-  <p class="muted" id="studentEmail"></p>
-  <p id="studentInfo" class="muted">Loading profile...</p>
+  <h2 id="studentWelcome">Welcome!</h2>
+  <p id="studentEmail" class="muted"></p>
  </div>
-
  <div class="card">
   <h2>Your Grades</h2>
-  <p class="muted">Your recorded assignment grades appear here.</p>
-  <div id="grades">
-   Loading grades...
-  </div>
+  <div id="studentGrades">Loading...</div>
+ </div>
+</div>
+
+<div id="adminPage" class="hidden">
+ <div class="card">
+  <h2>Teacher Dashboard</h2>
+  <p class="muted">Manage your students and their grades.</p>
+  <p id="adminStatus" class="notice"></p>
  </div>
 
+ <div class="card">
+  <h2>Students</h2>
+  <input id="studentSearch" placeholder="Search students..." oninput="renderStudents()">
+  <div id="studentList">Loading students...</div>
+ </div>
+
+ <div class="card">
+  <h2>Give a Grade</h2>
+  <label>Student</label>
+  <select id="gradeStudent"></select>
+
+  <label>Assignment</label>
+  <select id="gradeAssignment"></select>
+
+  <label>Points earned</label>
+  <input id="gradePoints" type="number" min="0" step="0.01" placeholder="Points earned">
+
+  <button onclick="saveGrade()">Save Grade</button>
+  <p id="gradeMessage" class="notice"></p>
+ </div>
+
+ <div class="card">
+  <h2>Recorded Grades</h2>
+  <div id="adminGrades">Loading grades...</div>
+ </div>
 </div>
 
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
 <script>
 const SUPABASE_URL = "https://tfasagpdyrsshpzjfxop.supabase.co";
-
 const SUPABASE_KEY = "sb_publishable_Xqsp4Sg-XrDthji84yiEfg_t9k1JG72";
 
-const db = window.supabase.createClient(
- SUPABASE_URL,
- SUPABASE_KEY
-);
+const db = window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 
-const loginPage = document.getElementById("loginPage");
-const dashboard = document.getElementById("dashboard");
-const message = document.getElementById("message");
+let currentUser = null;
+let students = [];
+let assignments = [];
+let grades = [];
 
-function showDashboard(){
- loginPage.classList.add("hidden");
- dashboard.classList.remove("hidden");
- document.getElementById("logoutButton").classList.remove("hidden");
+const $ = id => document.getElementById(id);
+
+function showPage(page){
+ ["loginPage","studentPage","adminPage"].forEach(id=>{
+  $(id).classList.add("hidden");
+ });
+ $(page).classList.remove("hidden");
+ $("logoutButton").classList.remove("hidden");
 }
 
 function showLogin(){
- dashboard.classList.add("hidden");
- loginPage.classList.remove("hidden");
- document.getElementById("logoutButton").classList.add("hidden");
+ ["studentPage","adminPage"].forEach(id=>$(id).classList.add("hidden"));
+ $("loginPage").classList.remove("hidden");
+ $("logoutButton").classList.add("hidden");
 }
 
 async function login(){
-
- const email = document.getElementById("email").value.trim();
- const password = document.getElementById("password").value;
- const button = document.getElementById("loginButton");
+ const email=$("email").value.trim();
+ const password=$("password").value;
 
  if(!email || !password){
-  message.textContent = "Enter your email and password.";
+  $("message").textContent="Enter your email and password.";
   return;
  }
 
- button.disabled = true;
- button.textContent = "Signing in...";
- message.textContent = "";
+ $("loginButton").disabled=true;
+ $("message").textContent="Signing in...";
 
- const {data,error} = await db.auth.signInWithPassword({
-  email,
-  password
- });
+ const {data,error}=await db.auth.signInWithPassword({email,password});
 
- button.disabled = false;
- button.textContent = "Sign In";
+ $("loginButton").disabled=false;
 
  if(error){
-  message.textContent = error.message;
+  $("message").textContent=error.message;
   return;
  }
 
- await loadDashboard(data.user);
+ await loadAccount(data.user);
 }
 
-async function loadDashboard(user){
+async function loadAccount(user){
+ currentUser=user;
 
- showDashboard();
+ // Check whether this account is registered as a teacher
+ const {data:teacher,error:teacherError}=await db
+  .from("teachers")
+  .select("id,full_name")
+  .eq("id",user.id)
+  .maybeSingle();
 
- document.getElementById("welcome").textContent = "Welcome!";
- document.getElementById("studentEmail").textContent = user.email || "";
- document.getElementById("studentInfo").textContent = "Loading profile...";
- document.getElementById("grades").textContent = "Loading grades...";
+ if(teacherError){
+  showLogin();
+  $("message").textContent="Could not check teacher account: "+teacherError.message;
+  return;
+ }
 
- // Load student profile
- const {data:student,error:studentError} = await db
+ if(teacher){
+  showPage("adminPage");
+  $("adminStatus").textContent="Signed in as "+(teacher.full_name || "Teacher");
+  await loadAdmin();
+  return;
+ }
+
+ // Otherwise load student dashboard
+ showPage("studentPage");
+ $("studentEmail").textContent=user.email || "";
+
+ const {data:student,error:studentError}=await db
   .from("students")
-  .select("id,username,full_name")
+  .select("full_name,username")
   .eq("id",user.id)
   .maybeSingle();
 
  if(studentError){
-  document.getElementById("studentInfo").textContent =
-   "Could not load student profile: " + studentError.message;
- }else if(student){
-  document.getElementById("welcome").textContent =
-   "Welcome, " + (student.full_name || student.username || "Student") + "!";
-
-  document.getElementById("studentInfo").textContent =
-   "Username: " + (student.username || "Not set");
+  $("studentWelcome").textContent="Welcome!";
+  $("studentGrades").textContent=studentError.message;
  }else{
-  document.getElementById("studentInfo").textContent =
-   "No student profile found for this account yet.";
+  $("studentWelcome").textContent="Welcome, "+(student?.full_name || student?.username || "Student")+"!";
+  await loadStudentGrades(user.id);
  }
+}
 
- // Load grades
- const gradesBox = document.getElementById("grades");
+async function loadStudentGrades(userId){
+ const box=$("studentGrades");
+ box.textContent="Loading grades...";
 
- const {data:grades,error:gradesError} = await db
+ const {data,error}=await db
   .from("grades")
-  .select("points_earned,assignments(title,points_possible,due_date)")
-  .eq("student_id",user.id);
+  .select("id,points_earned,assignments(title,points_possible)")
+  .eq("student_id",userId);
 
- if(gradesError){
-  gradesBox.textContent = "Could not load grades: " + gradesError.message;
+ if(error){
+  box.textContent="Could not load grades: "+error.message;
   return;
  }
 
- gradesBox.innerHTML = "";
+ box.innerHTML="";
 
- if(!grades || grades.length === 0){
-  gradesBox.textContent = "No grades have been added yet.";
+ if(!data || !data.length){
+  box.textContent="No grades recorded yet.";
   return;
  }
 
- grades.forEach(grade => {
-
-  const assignment = grade.assignments;
-
-  const item = document.createElement("div");
-  item.className = "grade";
-
-  const title = document.createElement("strong");
-  title.textContent = assignment?.title || "Assignment";
-
-  const score = document.createElement("p");
-  score.className = "muted";
-
-  score.textContent =
-   grade.points_earned + " / " +
-   (assignment?.points_possible ?? "?") + " points";
-
-  item.appendChild(title);
-  item.appendChild(score);
-
-  if(assignment?.due_date){
-   const due = document.createElement("p");
-   due.className = "muted";
-   due.textContent = "Due: " + assignment.due_date;
-   item.appendChild(due);
-  }
-
-  gradesBox.appendChild(item);
+ data.forEach(g=>{
+  const item=document.createElement("div");
+  item.className="grade";
+  const title=document.createElement("strong");
+  title.textContent=g.assignments?.title || "Assignment";
+  const score=document.createElement("p");
+  score.className="muted";
+  score.textContent=g.points_earned+" / "+(g.assignments?.points_possible ?? "?")+" points";
+  item.append(title,score);
+  box.appendChild(item);
  });
 }
 
-async function logout(){
+async function loadAdmin(){
+ $("studentList").textContent="Loading students...";
+ $("adminGrades").textContent="Loading grades...";
 
- await db.auth.signOut();
- showLogin();
+ const [studentResult,classResult,gradeResult]=await Promise.all([
+  db.from("students").select("id,username,full_name").order("full_name"),
+  db.from("classes").select("id,name").eq("teacher_id",currentUser.id),
+  db.from("grades").select("id,student_id,assignment_id,points_earned,assignments(title,points_possible)").order("created_at",{ascending:false})
+ ]);
 
- document.getElementById("email").value = "";
- document.getElementById("password").value = "";
- message.textContent = "Signed out.";
+ if(studentResult.error){
+  $("studentList").textContent="Student error: "+studentResult.error.message;
+  return;
+ }
+
+ if(classResult.error){
+  $("adminStatus").textContent="Class error: "+classResult.error.message;
+  return;
+ }
+
+ students=studentResult.data || [];
+
+ const classIds=(classResult.data || []).map(c=>c.id);
+
+ if(classIds.length){
+  const result=await db
+   .from("assignments")
+   .select("id,title,points_possible,class_id")
+   .in("class_id",classIds);
+
+  if(result.error){
+   $("adminStatus").textContent="Assignment error: "+result.error.message;
+   return;
+  }
+
+  assignments=result.data || [];
+ }else{
+  assignments=[];
+ }
+
+ grades=gradeResult.data || [];
+
+ renderStudents();
+ fillGradeOptions();
+ renderAdminGrades();
+
+ if(!assignments.length){
+  $("gradeMessage").textContent="No assignments found in your classes yet.";
+ }
 }
 
-// Restore existing login session
-async function checkSession(){
+function renderStudents(){
+ const box=$("studentList");
+ const search=$("studentSearch").value.toLowerCase();
 
- const {data,error} = await db.auth.getSession();
+ box.innerHTML="";
+
+ const filtered=students.filter(s=>
+  (s.full_name || "").toLowerCase().includes(search) ||
+  (s.username || "").toLowerCase().includes(search)
+ );
+
+ if(!filtered.length){
+  box.textContent="No students found.";
+  return;
+ }
+
+ filtered.forEach(s=>{
+  const item=document.createElement("div");
+  item.className="student";
+
+  const name=document.createElement("span");
+  name.textContent=(s.full_name || s.username || "Student")+" ("+(s.username || "no username")+")";
+
+  const button=document.createElement("button");
+  button.className="smallbutton";
+  button.textContent="Select";
+  button.onclick=()=>{
+   $("gradeStudent").value=s.id;
+   $("gradeStudent").scrollIntoView({behavior:"smooth",block:"center"});
+  };
+
+  item.append(name,button);
+  box.appendChild(item);
+ });
+}
+
+function fillGradeOptions(){
+ const studentSelect=$("gradeStudent");
+ const assignmentSelect=$("gradeAssignment");
+
+ studentSelect.innerHTML="";
+ assignmentSelect.innerHTML="";
+
+ students.forEach(s=>{
+  const option=document.createElement("option");
+  option.value=s.id;
+  option.textContent=s.full_name || s.username || s.id;
+  studentSelect.appendChild(option);
+ });
+
+ assignments.forEach(a=>{
+  const option=document.createElement("option");
+  option.value=a.id;
+  option.textContent=a.title+" ("+a.points_possible+" points possible)";
+  assignmentSelect.appendChild(option);
+ });
+
+ if(!students.length) studentSelect.innerHTML="<option value=''>No students</option>";
+ if(!assignments.length) assignmentSelect.innerHTML="<option value=''>No assignments</option>";
+}
+
+async function saveGrade(){
+ const studentId=$("gradeStudent").value;
+ const assignmentId=$("gradeAssignment").value;
+ const points=Number($("gradePoints").value);
+ const assignment=assignments.find(a=>a.id===assignmentId);
+
+ if(!studentId || !assignmentId || !assignment){
+  $("gradeMessage").textContent="Select a student and assignment first.";
+  return;
+ }
+
+ if($("gradePoints").value.trim()==="" || !Number.isFinite(points) || points<0 || points>Number(assignment.points_possible)){
+  $("gradeMessage").textContent="Enter a score between 0 and "+assignment.points_possible+".";
+  return;
+ }
+
+ $("gradeMessage").textContent="Saving grade...";
+
+ const {error}=await db.from("grades").insert({
+  student_id:studentId,
+  assignment_id:assignmentId,
+  points_earned:points
+ });
 
  if(error){
-  message.textContent = error.message;
+  $("gradeMessage").textContent="Could not save grade: "+error.message;
+  return;
+ }
+
+ $("gradeMessage").textContent="Grade saved!";
+ $("gradePoints").value="";
+ await loadAdmin();
+}
+
+function renderAdminGrades(){
+ const box=$("adminGrades");
+ box.innerHTML="";
+
+ if(!grades.length){
+  box.textContent="No grades have been entered yet.";
+  return;
+ }
+
+ grades.forEach(g=>{
+  const student=students.find(s=>s.id===g.student_id);
+  const item=document.createElement("div");
+  item.className="grade";
+
+  const title=document.createElement("strong");
+  title.textContent=(student?.full_name || student?.username || "Student")+" — "+(g.assignments?.title || "Assignment");
+
+  const score=document.createElement("p");
+  score.className="muted";
+  score.textContent=g.points_earned+" / "+(g.assignments?.points_possible ?? "?")+" points";
+
+  const edit=document.createElement("input");
+  edit.type="number";
+  edit.min="0";
+  edit.max=g.assignments?.points_possible ?? "";
+  edit.step="0.01";
+  edit.placeholder="New score";
+
+  const button=document.createElement("button");
+  button.textContent="Update Grade";
+  button.onclick=()=>updateGrade(g,edit.value,button);
+
+  item.append(title,score,edit,button);
+  box.appendChild(item);
+ });
+}
+
+async function updateGrade(grade,value,button){
+ const points=Number(value);
+ const max=Number(grade.assignments?.points_possible);
+
+ if(value.trim()==="" || !Number.isFinite(points) || points<0 || points>max){
+  alert("Enter a valid score between 0 and "+max+".");
+  return;
+ }
+
+ button.disabled=true;
+ button.textContent="Updating...";
+
+ const {error}=await db
+  .from("grades")
+  .update({points_earned:points})
+  .eq("id",grade.id);
+
+ button.disabled=false;
+ button.textContent="Update Grade";
+
+ if(error){
+  alert("Could not update grade: "+error.message);
+  return;
+ }
+
+ await loadAdmin();
+}
+
+async function logout(){
+ await db.auth.signOut();
+ currentUser=null;
+ showLogin();
+ $("email").value="";
+ $("password").value="";
+ $("message").textContent="Signed out.";
+}
+
+async function checkSession(){
+ const {data,error}=await db.auth.getSession();
+
+ if(error){
+  $("message").textContent=error.message;
   return;
  }
 
  if(data.session){
-  await loadDashboard(data.session.user);
+  await loadAccount(data.session.user);
  }
 }
 
 checkSession();
 </script>
-
 </body>
 </html>
