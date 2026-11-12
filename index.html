@@ -266,76 +266,28 @@ async function loadStudentGrades(userId){
 }
 
 async function loadAdmin(){
- $("studentList").textContent="Loading students...";
- $("adminGrades").textContent="Loading grades...";
+async function loadAdmin(){
 
- const [studentResult,classResult,gradeResult]=await Promise.all([
-  db.from("students")
-   .select("id,username,full_name")
-   .order("full_name"),
+ $("studentList").textContent="Checking database...";
 
-  db.from("classes")
-   .select("id,name")
-   .eq("teacher_id",currentUser.id),
+ const {data,error}=await db
+  .from("students")
+  .select("id,username,full_name");
 
-  db.from("grades")
-   .select("id,student_id,assignment_id,points_earned,assignments(title,points_possible)")
-   .order("created_at",{ascending:false})
- ]);
-
- if(studentResult.error){
-  $("studentList").textContent=
-   "Student error: "+studentResult.error.message;
+ if(error){
+  $("studentList").textContent="DATABASE ERROR: "+error.message;
+  $("adminStatus").textContent="Student query failed";
   return;
  }
 
- if(classResult.error){
-  $("adminStatus").textContent=
-   "Class error: "+classResult.error.message;
-  return;
- }
+ students=data || [];
 
- students=studentResult.data || [];
- 
- $("adminStatus").textContent =
- "Student query returned " + students.length +
- " students. Error: " + (studentResult.error?.message || "None");
-
- const classIds=(classResult.data || []).map(c=>c.id);
-
- if(classIds.length){
-  const result=await db
-   .from("assignments")
-   .select("id,title,points_possible,class_id")
-   .in("class_id",classIds);
-
-  if(result.error){
-   $("adminStatus").textContent=
-    "Assignment error: "+result.error.message;
-   return;
-  }
-
-  assignments=result.data || [];
- }else{
-  assignments=[];
- }
-
- if(gradeResult.error){
-  $("adminGrades").textContent=
-   "Grade error: "+gradeResult.error.message;
-  grades=[];
- }else{
-  grades=gradeResult.data || [];
- }
+ $("adminStatus").textContent=
+  "Database connected. Students found: "+students.length;
 
  renderStudents();
  fillGradeOptions();
- renderAdminGrades();
 
- if(!assignments.length){
-  $("gradeMessage").textContent=
-   "No assignments found in your classes.";
- }
 }
 
 function renderStudents(){
