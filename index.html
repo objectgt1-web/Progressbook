@@ -296,6 +296,10 @@ async function loadAdmin(){
  }
 
  students=studentResult.data || [];
+ 
+ $("adminStatus").textContent =
+ "Student query returned " + students.length +
+ " students. Error: " + (studentResult.error?.message || "None");
 
  const classIds=(classResult.data || []).map(c=>c.id);
 
